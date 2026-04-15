@@ -52,6 +52,12 @@ jupyter/chroma_langchain_db/
 jupyter/data/
 chromadb/
 
+# Frontend
+node_modules/
+dist/
+dist-ssr/
+*.local
+
 # OS generated files
 .DS_Store
 .DS_Store?

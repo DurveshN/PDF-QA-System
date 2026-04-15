@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Design Tokens ─────────────────────────────────────────────────────── */
+
+:root {
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Base Styles ───────────────────────────────────────────────────────── */
+
+body {
+  font-family: var(--font-sans);
+  @apply bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100;
+}
+
+/* ── Custom Scrollbar ──────────────────────────────────────────────────── */
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  @apply bg-gray-600/30 rounded-full;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-600/50;
+}
+
+/* Firefox */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.3) transparent;
+}
+
+/* ── Prose Overrides ───────────────────────────────────────────────────── */
+
+.prose pre {
+  @apply p-0 bg-transparent border-0 m-0;
+}
+
+.prose code {
+  font-family: var(--font-mono);
+}
+
+.prose table {
+  @apply text-sm;
+}
+
+.prose th {
+  @apply bg-gray-50 dark:bg-gray-800;
+}
+
+/* ── Highlight.js Theme Overrides ──────────────────────────────────────── */
+
+.hljs {
+  @apply bg-gray-50 dark:bg-gray-900 text-gray-800 dark:text-gray-200;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────── */
+
+@keyframes bounce-dot {
+  0%, 80%, 100% {
+    transform: scale(0);
+  }
+  40% {
+    transform: scale(1);
+  }
+}

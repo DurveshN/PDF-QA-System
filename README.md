@@ -10,6 +10,7 @@ An AI-powered Question-Answering system for PDF documents. The application lever
 
 ## Project Structure
 
+- `frontend/`: React single-page application built with Vite, Tailwind CSS, and Zustand.
 - `backend/`: The FastAPI backend containing routing, core AI modules, and RAG implementations.
 - `jupyter/`: Jupyter notebooks used for data exploration, rapid prototyping, and workflow validation.
 - `docs/`: Reference documentation regarding specific integration components like LangChain, Exa, and Gemma.
@@ -20,6 +21,8 @@ An AI-powered Question-Answering system for PDF documents. The application lever
 - **Node.js**: If running a separate front-end client (expected at `http://localhost:5173`).
 
 ## Setup and Installation
+
+### Backend Setup
 
 1. **Clone the repository**:
    ```bash
@@ -56,13 +59,36 @@ An AI-powered Question-Answering system for PDF documents. The application lever
    BACKEND_PORT=8000
    ```
 
+### Frontend Setup
+
+1. **Navigate to the frontend directory**:
+   ```bash
+   cd frontend
+   ```
+
+2. **Install Node modules**:
+   ```bash
+   npm install
+   ```
+
+3. **Environment Variables**:
+   Create a `.env` file in the `frontend/` directory (if required). By default, Vite will connect to the backend running at `http://localhost:8000`.
+
 ## Running the Application
 
 Ensure Ollama is running in the background.
 
+**1. Start the Backend**:
 ```bash
 cd backend
 python main.py
 ```
+The API will be accessible over `http://localhost:8000`. You can interact with the Swagger docs at `http://localhost:8000/docs`.
 
-The system will initialize local embeddings and language models. The API will be accessible over `http://localhost:8000`. You can test the application by visiting `http://localhost:8000/health` or interact with the Swagger docs at `http://localhost:8000/docs`.
+**2. Start the Frontend**:
+In a separate terminal session:
+```bash
+cd frontend
+npm run dev
+```
+The user interface will be accessible at `http://localhost:5173`.
