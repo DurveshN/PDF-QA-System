@@ -1,0 +1,16 @@
+fastapi[standard]
+uvicorn[standard]
+websockets
+python-multipart
+python-dotenv
+langchain-core
+langchain-ollama
+langchain-chroma
+sentence-transformers
+torch
+chromadb
+exa-py
+google-genai
+huggingface_hub
+aiofiles
+pydantic
