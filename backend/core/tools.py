@@ -241,7 +241,16 @@ def generate_diagram_impl(
         "status": "success",
         "topic": topic,
         "diagram_type": diagram_type,
-        "instruction": f"Generate a Mermaid {diagram_type} diagram. Wrap in ```mermaid``` fences.",
+        "instruction": (
+            f"Generate a valid Mermaid.js {diagram_type} diagram based on the chunks below. "
+            f"IMPORTANT RULES for valid Mermaid syntax:\n"
+            f"- Start with the diagram type keyword on the first line (e.g. 'flowchart TD', 'graph LR', 'sequenceDiagram', 'mindmap')\n"
+            f"- Use simple alphanumeric node IDs (A, B, C or node1, node2) — NO spaces in IDs\n"
+            f"- Put labels in square brackets: A[My Label] --> B[Other Label]\n"
+            f"- Use --> for arrows, --- for lines\n"
+            f"- Do NOT use special characters like parentheses, colons, or quotes inside node IDs\n"
+            f"- Wrap the diagram in ```mermaid``` code fences\n"
+        ),
         "chunks": chunks_data.get("chunks", []),
     }, ensure_ascii=False, indent=2)
 
@@ -279,6 +288,8 @@ def make_tools(
     from core.memory import save_memory_impl
 
     tools = []
+    print(f"[TOOLS] Building tools: vs={'yes' if vector_store else 'no'}, "
+          f"exa={'yes' if exa_client else 'no'}, web_search={enable_web_search}")
 
     # ── retrieve_chunks ──────────────────────────────────────────────────
 

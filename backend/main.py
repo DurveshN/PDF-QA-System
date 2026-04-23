@@ -64,8 +64,8 @@ async def lifespan(app: FastAPI):
         ollama_info = await check_ollama_status()
         print(f"[OK] Ollama OK -- model: {ollama_info['model']}")
     except (ConnectionError, ValueError) as e:
-        print(f"[FAIL] Ollama check failed: {e}")
-        sys.exit(1)
+        print(f"[WARN] Ollama check failed: {e}")
+        print("[WARN] Server will start but chat will not work until Ollama is running.")
 
     # ── 3. Init ChatOllama ───────────────────────────────────────────────
     app.state.llm = get_llm()

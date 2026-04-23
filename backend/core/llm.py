@@ -46,8 +46,15 @@ def get_llm_with_tools(llm: ChatOllama, tools: list) -> ChatOllama:
         A new ChatOllama instance with tools bound.
     """
     if not tools:
+        print("[LLM] No tools to bind")
         return llm
-    return llm.bind_tools(tools)
+
+    tool_names = [t.name for t in tools]
+    print(f"[LLM] Binding {len(tools)} tools: {tool_names}")
+
+    bound = llm.bind_tools(tools)
+    print(f"[LLM] Tools bound successfully")
+    return bound
 
 
 async def check_ollama_status() -> dict:

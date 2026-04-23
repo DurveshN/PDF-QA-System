@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Brain, ChevronDown } from 'lucide-react'
 
@@ -12,6 +12,11 @@ export default function ThinkingBubble({
   isLive = false,
 }: ThinkingBubbleProps) {
   const [expanded, setExpanded] = useState(isLive)
+
+  // Auto-expand when live thinking starts, auto-collapse when done
+  useEffect(() => {
+    if (isLive) setExpanded(true)
+  }, [isLive])
 
   if (!content) return null
 

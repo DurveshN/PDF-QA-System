@@ -43,6 +43,10 @@ SESSIONS_DIR = os.path.join(
 # Async lock for thread-safe file operations
 _memory_lock = asyncio.Lock()
 
+# Thread lock for sync file operations (used by tool calls in thread pool)
+import threading
+_thread_lock = threading.Lock()
+
 
 def _read_memory_file() -> dict:
     """Read the memory JSON file synchronously."""
@@ -77,15 +81,20 @@ def save_memory_impl(key: str, value: str, session_id: str = "") -> str:
     Returns:
         JSON string confirming the save.
     """
-    memories = _read_memory_file()
+    print(f"  [MEMORY] Saving: {key} = {value} (session: {session_id})")
 
-    memories[key] = {
-        "value": value,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-        "session_id": session_id,
-    }
+    with _thread_lock:
+        memories = _read_memory_file()
 
-    _write_memory_file(memories)
+        memories[key] = {
+            "value": value,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "session_id": session_id,
+        }
+
+        _write_memory_file(memories)
+
+    print(f"  [MEMORY] Saved successfully: {key}")
 
     return json.dumps({
         "status": "success",
@@ -120,13 +129,14 @@ def delete_memory(key: str) -> bool:
     Returns:
         True if deleted, False if key didn't exist.
     """
-    memories = _read_memory_file()
+    with _thread_lock:
+        memories = _read_memory_file()
 
-    if key not in memories:
-        return False
+        if key not in memories:
+            return False
 
-    del memories[key]
-    _write_memory_file(memories)
+        del memories[key]
+        _write_memory_file(memories)
     return True
 
 

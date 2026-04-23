@@ -7,181 +7,175 @@ const WS_BASE = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
 export function useWebSocket(sessionId: string | null) {
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>()
-  const isConnectedRef = useRef(false)
+  const sessionIdRef = useRef(sessionId)
 
-  const {
-    setIsStreaming,
-    appendThinking,
-    appendContent,
-    addToolCall,
-    updateToolCallResult,
-    addDiagram,
-    resetStreamState,
-    addMessage,
-    updateSessionTitle,
-  } = useChatStore()
+  // Keep sessionId ref in sync without causing reconnects
+  sessionIdRef.current = sessionId
 
-  const connect = useCallback(() => {
+  const handleEvent = useCallback((event: WSEvent) => {
+    const sid = sessionIdRef.current
+    if (!sid) return
+
+    const store = useChatStore.getState()
+
+    switch (event.type) {
+      case 'ready':
+        break
+
+      case 'thinking':
+        if (event.content) {
+          store.appendThinking(event.content)
+        }
+        break
+
+      case 'content':
+        if (event.content) {
+          store.appendContent(event.content)
+        }
+        break
+
+      case 'tool_call':
+        if (event.tool) {
+          const tc: ToolCall = {
+            id: `tc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            name: event.tool,
+            args: event.args ?? {},
+          }
+          store.addToolCall(tc)
+        }
+        break
+
+      case 'tool_result':
+        if (event.tool) {
+          const matching = store.currentToolCalls.filter(
+            (tc) => tc.name === event.tool && !tc.result
+          )
+          if (matching.length > 0) {
+            store.updateToolCallResult(
+              matching[matching.length - 1].id,
+              event.result ?? ''
+            )
+          }
+        }
+        break
+
+      case 'diagram':
+        if (event.mermaid_code) {
+          const diagram: DiagramData = {
+            id: `diag_${Date.now()}`,
+            mermaid_code: event.mermaid_code,
+          }
+          store.addDiagram(diagram)
+        }
+        break
+
+      case 'done': {
+        // Build the final assistant message from accumulated state
+        const assistantMsg = {
+          id: `msg_${Date.now()}`,
+          role: 'assistant' as const,
+          content: store.currentContent,
+          timestamp: new Date().toISOString(),
+          thinking: store.currentThinking || undefined,
+          tool_calls:
+            store.currentToolCalls.length > 0
+              ? store.currentToolCalls
+              : undefined,
+          diagrams:
+            store.currentDiagrams.length > 0
+              ? store.currentDiagrams
+              : undefined,
+        }
+        store.addMessage(sid, assistantMsg)
+        store.setIsStreaming(false)
+        store.resetStreamState()
+
+        // Update title if returned
+        if (event.title) {
+          store.updateSessionTitle(sid, event.title)
+        }
+        break
+      }
+
+      case 'error':
+        store.setIsStreaming(false)
+        store.resetStreamState()
+        store.addMessage(sid, {
+          id: `msg_err_${Date.now()}`,
+          role: 'assistant',
+          content: `⚠️ Error: ${event.message ?? 'Unknown error'}`,
+          timestamp: new Date().toISOString(),
+        })
+        break
+    }
+  }, [])
+
+  // Connect/disconnect only when sessionId changes
+  useEffect(() => {
     if (!sessionId) return
 
-    // Clean up existing connection
+    // Clear any pending reconnect
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current)
+      reconnectTimer.current = undefined
+    }
+
+    // Close existing connection
     if (wsRef.current) {
+      wsRef.current.onclose = null // prevent reconnect from old socket
       wsRef.current.close()
       wsRef.current = null
     }
 
-    const ws = new WebSocket(`${WS_BASE}/ws/chat/${sessionId}`)
-    wsRef.current = ws
+    function doConnect() {
+      if (sessionIdRef.current !== sessionId) return // stale
 
-    ws.onopen = () => {
-      isConnectedRef.current = true
-    }
+      const ws = new WebSocket(`${WS_BASE}/ws/chat/${sessionId}`)
+      wsRef.current = ws
 
-    ws.onmessage = (event) => {
-      try {
-        const data: WSEvent = JSON.parse(event.data)
-        handleEvent(data)
-      } catch {
-        // ignore non-JSON messages
+      ws.onopen = () => {
+        console.log(`[WS] Connected to session ${sessionId?.slice(0, 8)}`)
       }
-    }
 
-    ws.onclose = () => {
-      isConnectedRef.current = false
-      // Auto-reconnect after 3s if session is still active
-      const currentSessionId = useChatStore.getState().activeSessionId
-      if (currentSessionId === sessionId) {
-        reconnectTimer.current = setTimeout(() => {
-          connect()
-        }, 3000)
-      }
-    }
-
-    ws.onerror = () => {
-      ws.close()
-    }
-  }, [sessionId])
-
-  const handleEvent = useCallback(
-    (event: WSEvent) => {
-      if (!sessionId) return
-
-      switch (event.type) {
-        case 'ready':
-          break
-
-        case 'thinking':
-          if (event.content) {
-            appendThinking(event.content)
-          }
-          break
-
-        case 'content':
-          if (event.content) {
-            appendContent(event.content)
-          }
-          break
-
-        case 'tool_call':
-          if (event.tool) {
-            const tc: ToolCall = {
-              id: `tc_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-              name: event.tool,
-              args: event.args ?? {},
-            }
-            addToolCall(tc)
-          }
-          break
-
-        case 'tool_result':
-          if (event.tool) {
-            // Update the last tool call with this name
-            const store = useChatStore.getState()
-            const matching = store.currentToolCalls.filter(
-              (tc) => tc.name === event.tool && !tc.result
-            )
-            if (matching.length > 0) {
-              updateToolCallResult(
-                matching[matching.length - 1].id,
-                event.result ?? ''
-              )
-            }
-          }
-          break
-
-        case 'diagram':
-          if (event.mermaid_code) {
-            const diagram: DiagramData = {
-              id: `diag_${Date.now()}`,
-              mermaid_code: event.mermaid_code,
-            }
-            addDiagram(diagram)
-          }
-          break
-
-        case 'done': {
-          const store = useChatStore.getState()
-          // Build the final assistant message
-          const assistantMsg = {
-            id: `msg_${Date.now()}`,
-            role: 'assistant' as const,
-            content: store.currentContent,
-            timestamp: new Date().toISOString(),
-            thinking: store.currentThinking || undefined,
-            tool_calls:
-              store.currentToolCalls.length > 0
-                ? store.currentToolCalls
-                : undefined,
-            diagrams:
-              store.currentDiagrams.length > 0
-                ? store.currentDiagrams
-                : undefined,
-          }
-          addMessage(sessionId, assistantMsg)
-          setIsStreaming(false)
-          resetStreamState()
-
-          // Update title if returned
-          if (event.title) {
-            updateSessionTitle(sessionId, event.title)
-          }
-          break
+      ws.onmessage = (event) => {
+        try {
+          const data: WSEvent = JSON.parse(event.data)
+          handleEvent(data)
+        } catch {
+          // ignore non-JSON
         }
-
-        case 'error':
-          setIsStreaming(false)
-          resetStreamState()
-          // Add error as assistant message
-          addMessage(sessionId, {
-            id: `msg_err_${Date.now()}`,
-            role: 'assistant',
-            content: `⚠️ Error: ${event.message ?? 'Unknown error'}`,
-            timestamp: new Date().toISOString(),
-          })
-          break
       }
-    },
-    [sessionId]
-  )
 
-  // Connect when session changes
-  useEffect(() => {
-    connect()
+      ws.onclose = () => {
+        console.log(`[WS] Disconnected from session ${sessionId?.slice(0, 8)}`)
+        // Only reconnect if this session is still active
+        if (sessionIdRef.current === sessionId) {
+          reconnectTimer.current = setTimeout(doConnect, 3000)
+        }
+      }
+
+      ws.onerror = () => {
+        ws.close()
+      }
+    }
+
+    doConnect()
+
     return () => {
-      if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
+      if (reconnectTimer.current) {
+        clearTimeout(reconnectTimer.current)
+        reconnectTimer.current = undefined
+      }
       if (wsRef.current) {
+        wsRef.current.onclose = null
         wsRef.current.close()
         wsRef.current = null
       }
     }
-  }, [connect])
+  }, [sessionId, handleEvent])
 
   const sendMessage = useCallback(
-    (
-      message: string,
-      imageBase64: string | null,
-      settings: ChatSettings
-    ) => {
+    (message: string, imageBase64: string | null, settings: ChatSettings) => {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         return false
       }
@@ -205,11 +199,16 @@ export function useWebSocket(sessionId: string | null) {
   )
 
   const disconnect = useCallback(() => {
+    if (reconnectTimer.current) {
+      clearTimeout(reconnectTimer.current)
+      reconnectTimer.current = undefined
+    }
     if (wsRef.current) {
+      wsRef.current.onclose = null
       wsRef.current.close()
       wsRef.current = null
     }
   }, [])
 
-  return { sendMessage, disconnect, isConnected: isConnectedRef }
+  return { sendMessage, disconnect }
 }

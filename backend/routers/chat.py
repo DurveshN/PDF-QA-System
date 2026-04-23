@@ -9,10 +9,12 @@ Handles:
   - Runs the agentic loop with streaming
   - Auto-titles session on first message (first 50 chars, no LLM call)
   - Persists updated chat history after each exchange
+  - Refreshes memories after each exchange (in case save_memory was called)
 """
 
 import os
 import json
+import re
 import uuid
 import asyncio
 from datetime import datetime, timezone
@@ -23,7 +25,7 @@ from core.tools import make_tools
 from core.llm import get_llm_with_tools
 from core.vectorstore import load_session_vectorstore, release_session_store
 from core.memory import load_memory
-from core.agent import build_system_prompt, run_agent_streaming
+from core.agent import build_system_prompt, run_agent_streaming, MERMAID_PATTERN, _extract_thinking, _strip_thinking
 
 
 router = APIRouter(tags=["chat"])
@@ -188,6 +190,11 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             else:
                 user_content = message_text
 
+            # ── Refresh memories before each message ─────────────────────
+            # This ensures memories saved by save_memory tool in previous
+            # messages are visible in the system prompt
+            memories = await asyncio.to_thread(load_memory)
+
             # ── Build session-scoped tools via closures ──────────────────
             tools_list = make_tools(
                 vector_store=session_vs,
@@ -197,8 +204,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             )
             llm_with_tools = get_llm_with_tools(app.state.llm, tools_list)
 
-            # Tool map for execute_tool_call
+            # Tool map for execute_tool_call — maps name → @tool object
             tool_map = {t.name: t for t in tools_list}
+
+            print(f"\n[CHAT] Session: {session_id}")
+            print(f"[CHAT] Tools bound: {list(tool_map.keys())}")
+            print(f"[CHAT] has_notes={has_notes}, thinking={enable_thinking}, verbose={enable_verbose}")
 
             # ── Build system prompt ──────────────────────────────────────
             # Get topics data if notes exist
@@ -236,12 +247,13 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             )
             session["messages"].append(user_msg)
 
-            # ── Auto-title on first message ──────────────────────────────
-            if len(session["messages"]) == 1:
-                title = message_text[:50].strip()
+            # ── Auto-title on first user message ─────────────────────────
+            new_title = None
+            if len([m for m in session["messages"] if m.get("role") == "user"]) == 1:
+                new_title = message_text[:50].strip()
                 if len(message_text) > 50:
-                    title += "..."
-                session["title"] = title
+                    new_title += "..."
+                session["title"] = new_title
 
             # ── Run the agentic loop ─────────────────────────────────────
             try:
@@ -256,38 +268,30 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                     session_id=session_id,
                 )
             except Exception as e:
-                await websocket.send_json({
-                    "type": "error",
-                    "message": f"Agent error: {str(e)}",
-                })
+                print(f"[CHAT] Agent error: {e}")
+                import traceback
+                traceback.print_exc()
+                try:
+                    await websocket.send_json({
+                        "type": "error",
+                        "message": f"Agent error: {str(e)}",
+                    })
+                except Exception:
+                    pass
                 # Still persist what we have
                 await asyncio.to_thread(_write_session, session_id, session)
                 continue
 
             # ── Persist assistant message ────────────────────────────────
-            # Extract thinking and diagrams from the final answer
-            import re
-            thinking = None
-            thinking_match = re.search(
-                r"<\|channel>thought\n(.*?)<channel\|>",
-                final_answer,
-                re.DOTALL,
-            )
-            if thinking_match:
-                thinking = thinking_match.group(1).strip()
+            # Extract thinking from the raw final answer
+            thinking = _extract_thinking(final_answer)
 
             # Extract mermaid diagrams
-            from core.agent import MERMAID_PATTERN
             mermaid_matches = MERMAID_PATTERN.findall(final_answer)
             diagrams = [{"mermaid_code": m.strip()} for m in mermaid_matches]
 
             # Clean answer for storage (strip thinking blocks)
-            clean_answer = re.sub(
-                r"<\|channel>thought\n.*?<channel\|>",
-                "",
-                final_answer,
-                flags=re.DOTALL,
-            ).strip()
+            clean_answer = _strip_thinking(final_answer)
 
             assistant_msg = _serialize_message(
                 role="assistant",
@@ -300,10 +304,29 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
             # ── Persist session ──────────────────────────────────────────
             await asyncio.to_thread(_write_session, session_id, session)
 
+            # ── Send done event with title ───────────────────────────────
+            done_event = {
+                "type": "done",
+                "session_id": session_id,
+            }
+            if new_title:
+                done_event["title"] = new_title
+
+            try:
+                await websocket.send_json(done_event)
+            except Exception:
+                pass
+
+            # ── Refresh memories after exchange ──────────────────────────
+            # In case save_memory was called during this exchange
+            memories = await asyncio.to_thread(load_memory)
+
     except WebSocketDisconnect:
         print(f"WebSocket disconnected for session {session_id}")
     except Exception as e:
         print(f"WebSocket error for session {session_id}: {e}")
+        import traceback
+        traceback.print_exc()
         try:
             await websocket.send_json({
                 "type": "error",

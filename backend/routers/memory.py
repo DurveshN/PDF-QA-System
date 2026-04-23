@@ -25,9 +25,9 @@ class MemorySaveRequest(BaseModel):
 
 @router.get("")
 async def list_memories():
-    """Return all saved memories."""
+    """Return all saved memories as a flat dict."""
     memories = await asyncio.to_thread(load_memory)
-    return {"memories": memories}
+    return memories
 
 
 @router.post("")

@@ -1,0 +1,21 @@
+{
+  "mcpServers": {},
+  "powers": {
+    "mcpServers": {
+      "power-postman-postman": {
+        "url": "https://mcp.postman.com/minimal",
+        "headers": {
+          "Authorization": "Bearer YOUR_POSTMAN_API_KEY_HERE"
+        }
+      },
+      "power-firebase-firebase-local": {
+        "command": "npx",
+        "args": [
+          "-y",
+          "firebase-tools@latest",
+          "mcp"
+        ]
+      }
+    }
+  }
+}
