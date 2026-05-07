@@ -118,10 +118,5 @@ This isn't just a simple prompt-response app. Our agent uses a sophisticated loo
 
 ---
 
-## 📄 License
-Distributed under the MIT License. See `LICENSE` for more information.
-
----
-
 ## ⭐️ Support the Project
 If you find this project useful, please give it a star! It helps others discover the power of local Agentic RAG.
