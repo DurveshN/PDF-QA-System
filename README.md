@@ -413,12 +413,6 @@ Contributions are welcome! Please follow these steps:
 
 ---
 
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
 ## 🙏 Acknowledgments
 
 - **Ollama** for local LLM inference capabilities
@@ -428,20 +422,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Google** for the Gemma model family
 
 ---
-
-## 📧 Contact
-
-For questions or feedback, please open an issue or reach out:
-
-- **GitHub**: [@yourusername](https://github.com/yourusername)
-- **Email**: your.email@example.com
-
----
-
-<div align="center">
-
-**⭐ Star this repository if you find it helpful!**
-
-Made with ❤️ by [Your Name]
-
-</div>
