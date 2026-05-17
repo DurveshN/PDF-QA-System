@@ -66,3 +66,15 @@ dist-ssr/
 .Trashes
 ehthumbs.db
 Thumbs.db
+
+# Kiro AI Assistant
+.kiro/
+AGENTS.md
+backend/AGENTS.md
+frontend/AGENTS.md
+
+# Project Planning & Documentation
+implementation_plan.md
+
+# Python Cache
+.ruff_cache/
